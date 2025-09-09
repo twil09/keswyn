@@ -50,16 +50,14 @@ serve(async (req) => {
     logStep("Customer lookup", { customerId });
 
     // Map tiers to Stripe Price IDs
-    // Note: You provided Product IDs, but we need Price IDs here
-    // Go to Stripe Dashboard → Products → Click on each product → Copy the Price ID (starts with "price_")
     const priceMap = {
       premium_student: {
-        monthly: "price_YOUR_MONTHLY_STUDENT_PRICE_ID", // From product: prod_T188QtahKlxRgZ
-        annual: "price_YOUR_ANNUAL_STUDENT_PRICE_ID"    // From product: prod_T183aTwVkFja9c
+        monthly: "price_1S55rvL32jbOyYBfIyVrHe8h",
+        annual: "price_1S55njL32jbOyYBfEnm7Hxsz"
       },
       premium_teacher: {
-        monthly: "price_YOUR_MONTHLY_TEACHER_PRICE_ID", // From product: prod_T18CHWJC0EhQWR  
-        annual: "price_YOUR_ANNUAL_TEACHER_PRICE_ID"    // From product: prod_T188L675XzFhOx
+        monthly: "price_1S55wBL32jbOyYBfotDXY6KP",
+        annual: "price_1S55sUL32jbOyYBfpuh0m2F9"
       }
     };
 
