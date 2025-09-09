@@ -451,6 +451,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_access_class: {
+        Args: { _class_id: string; _user_id: string }
+        Returns: boolean
+      }
       can_access_course: {
         Args: { _course_id: string; _user_id: string }
         Returns: boolean
