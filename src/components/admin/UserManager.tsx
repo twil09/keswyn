@@ -30,15 +30,45 @@ export function UserManager() {
 
   const fetchProfiles = async () => {
     try {
-      // For admin dashboard, we need to get all users, so we call without parameters
-      // The secure function will handle permissions based on the current user's role
+      // Get all profiles using a secure approach that respects RLS and doesn't expose sensitive data
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, user_id, full_name, email, role, created_at')
+        .select('id, user_id, role, created_at')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setProfiles(data || []);
+      
+      // For each profile, get safe data using the secure function
+      const profilesWithSafeData = await Promise.all(
+        (data || []).map(async (profile) => {
+          try {
+            const { data: safeProfile } = await supabase
+              .rpc('get_safe_profile', { target_user_id: profile.user_id })
+              .single();
+            
+            return {
+              id: profile.id,
+              user_id: profile.user_id,
+              full_name: safeProfile?.full_name || 'Protected',
+              email: safeProfile?.email || 'Protected',
+              role: profile.role,
+              created_at: profile.created_at
+            };
+          } catch {
+            // If we can't access the safe profile data, return protected info
+            return {
+              id: profile.id,
+              user_id: profile.user_id,
+              full_name: 'Protected',
+              email: 'Protected', 
+              role: profile.role,
+              created_at: profile.created_at
+            };
+          }
+        })
+      );
+      
+      setProfiles(profilesWithSafeData);
     } catch (error: any) {
       toast({
         title: "Error fetching users", 
