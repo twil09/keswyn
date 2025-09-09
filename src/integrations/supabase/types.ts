@@ -82,6 +82,7 @@ export type Database = {
       courses: {
         Row: {
           category: string
+          completion_rate: number | null
           created_at: string
           created_by: string | null
           description: string | null
@@ -89,11 +90,13 @@ export type Database = {
           duration: string | null
           id: string
           is_premium: boolean
+          student_count: number | null
           title: string
           updated_at: string
         }
         Insert: {
           category: string
+          completion_rate?: number | null
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -101,11 +104,13 @@ export type Database = {
           duration?: string | null
           id?: string
           is_premium?: boolean
+          student_count?: number | null
           title: string
           updated_at?: string
         }
         Update: {
           category?: string
+          completion_rate?: number | null
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -113,6 +118,7 @@ export type Database = {
           duration?: string | null
           id?: string
           is_premium?: boolean
+          student_count?: number | null
           title?: string
           updated_at?: string
         }
@@ -481,6 +487,10 @@ export type Database = {
       is_teacher: {
         Args: { _user_id: string }
         Returns: boolean
+      }
+      update_course_completion_rate: {
+        Args: { _course_id: string }
+        Returns: undefined
       }
       verify_admin_pin: {
         Args: { hashed_pin: string; pin_text: string }
