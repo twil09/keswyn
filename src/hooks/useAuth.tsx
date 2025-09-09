@@ -38,10 +38,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Fetch user role and subscription after authentication
           setTimeout(async () => {
             try {
+              // Use secure function to get safe profile data
               const { data: profile } = await supabase
-                .from('profiles')
-                .select('role, subscription_tier')
-                .eq('user_id', session.user.id)
+                .rpc('get_safe_profile', { target_user_id: session.user.id })
                 .single();
               
               const role = profile?.role || 'free_student';
@@ -49,8 +48,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               setSubscriptionTier(profile?.subscription_tier || 'free');
               setIsAdmin(role === 'super_admin' || role === 'admin');
               
-              // Check subscription status
-              await checkSubscription();
+              // Check subscription status using secure function
+              await checkSubscriptionSecurely();
             } catch (error) {
               console.error('Error fetching user profile:', error);
               setUserRole('free_student');
@@ -131,6 +130,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       title: "Signed out",
       description: "You have been signed out successfully.",
     });
+  };
+
+  const checkSubscriptionSecurely = async () => {
+    try {
+      // Use secure database function instead of direct table access
+      const { data, error } = await supabase
+        .rpc('get_user_subscription_status')
+        .single();
+      
+      if (error) {
+        console.error('Error checking subscription:', error);
+        return;
+      }
+      
+      if (data) {
+        setSubscriptionTier(data.subscription_tier || 'free');
+      }
+    } catch (error) {
+      console.error('Error checking subscription:', error);
+    }
   };
 
   const checkSubscription = async () => {

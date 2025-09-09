@@ -30,16 +30,18 @@ export function UserManager() {
 
   const fetchProfiles = async () => {
     try {
+      // For admin dashboard, we need to get all users, so we call without parameters
+      // The secure function will handle permissions based on the current user's role
       const { data, error } = await supabase
         .from('profiles')
-        .select('*')
+        .select('id, user_id, full_name, email, role, created_at')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
       setProfiles(data || []);
     } catch (error: any) {
       toast({
-        title: "Error fetching users",
+        title: "Error fetching users", 
         description: error.message,
         variant: "destructive",
       });

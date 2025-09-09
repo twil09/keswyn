@@ -469,6 +469,32 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Database["public"]["Enums"]["app_role"]
       }
+      get_safe_profile: {
+        Args: { target_user_id?: string }
+        Returns: {
+          created_at: string
+          email: string
+          full_name: string
+          has_admin_pin: boolean
+          id: string
+          max_classes: number
+          pin_set_at: string
+          role: Database["public"]["Enums"]["app_role"]
+          subscription_end: string
+          subscription_status: string
+          subscription_tier: string
+          updated_at: string
+          user_id: string
+        }[]
+      }
+      get_user_subscription_status: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          subscribed: boolean
+          subscription_end: string
+          subscription_tier: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -482,6 +508,10 @@ export type Database = {
       }
       is_admin: {
         Args: { _user_id: string }
+        Returns: boolean
+      }
+      is_super_admin: {
+        Args: Record<PropertyKey, never>
         Returns: boolean
       }
       is_teacher: {
