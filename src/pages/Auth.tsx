@@ -48,7 +48,7 @@ export default function Auth() {
         <div className="w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-4">
           <GraduationCap className="w-8 h-8 text-primary" />
         </div>
-        <h1 className="text-4xl font-bold text-white mb-2">EduPlatform</h1>
+        <h1 className="text-4xl font-bold text-white mb-2">Keswyn</h1>
         <p className="text-gray-300">Transform your learning journey</p>
       </div>
 
@@ -130,41 +130,6 @@ export default function Auth() {
             </button>
           </div>
 
-          {isLogin && (
-            <>
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-600"></div>
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="bg-gray-800/50 px-2 text-gray-400">Quick Demo:</span>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full bg-transparent border-gray-600 text-white hover:bg-gray-700/50"
-                  onClick={() => handleDemoLogin('student')}
-                  disabled={loading}
-                >
-                  <User className="w-4 h-4 mr-2" />
-                  Try as Student
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full bg-transparent border-gray-600 text-white hover:bg-gray-700/50"
-                  onClick={() => handleDemoLogin('teacher')}
-                  disabled={loading}
-                >
-                  <Users className="w-4 h-4 mr-2" />
-                  Try as Teacher
-                </Button>
-              </div>
-            </>
-          )}
         </CardContent>
       </Card>
 
