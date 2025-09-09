@@ -1,0 +1,2 @@
+-- Enable leaked password protection
+-- This will be handled via Supabase dashboard settings
