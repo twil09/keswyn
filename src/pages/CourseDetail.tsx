@@ -1,182 +1,199 @@
-import { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Play, CheckCircle, Lock, Clock, Users, Star, Award } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { useProgressTracker } from '@/components/ProgressTracker';
+import { useToast } from '@/hooks/use-toast';
+import {
+  ArrowLeft,
+  BookOpen,
+  Clock,
+  Users,
+  Star,
+  Play,
+  CheckCircle,
+  Lock,
+  FileText,
+  Video,
+  Award
+} from 'lucide-react';
 
-interface CourseStep {
+interface Course {
   id: string;
   title: string;
   description: string;
+  category: string;
+  difficulty: string;
   duration: string;
-  type: "video" | "reading" | "practice" | "quiz";
-  isCompleted: boolean;
-  isLocked: boolean;
+  student_count: number;
+  rating?: string;
+  progress?: number;
+  modules: CourseModule[];
 }
 
 interface CourseModule {
   id: string;
   title: string;
   description: string;
-  duration: string;
+  order_index: number;
   steps: CourseStep[];
 }
 
-const courseData: Record<string, any> = {
-  "python-fundamentals": {
-    title: "Python Fundamentals",
-    description: "Master the basics of Python programming with hands-on exercises and real-world projects.",
-    category: "coding",
-    difficulty: "Beginner",
-    duration: "8 weeks",
-    students: 15420,
-    rating: 4.8,
-    progress: 0,
-    modules: [
-      {
-        id: "intro",
-        title: "Introduction to Python",
-        description: "Get started with Python syntax and basic concepts",
-        duration: "2 hours",
-        steps: [
-          {
-            id: "setup",
-            title: "Setting up Python Environment",
-            description: "Install Python and set up your development environment",
-            duration: "15 min",
-            type: "video",
-            isCompleted: false,
-            isLocked: false
-          },
-          {
-            id: "syntax",
-            title: "Python Syntax Basics",
-            description: "Learn about variables, data types, and basic operations",
-            duration: "30 min",
-            type: "reading",
-            isCompleted: false,
-            isLocked: false
-          },
-          {
-            id: "practice1",
-            title: "First Python Program",
-            description: "Write and run your first Python program",
-            duration: "45 min",
-            type: "practice",
-            isCompleted: false,
-            isLocked: false
-          }
-        ]
-      },
-      {
-        id: "control",
-        title: "Control Structures",
-        description: "Master if statements, loops, and conditional logic",
-        duration: "3 hours",
-        steps: [
-          {
-            id: "conditions",
-            title: "If Statements and Conditions",
-            description: "Learn how to make decisions in your code",
-            duration: "45 min",
-            type: "video",
-            isCompleted: false,
-            isLocked: true
-          },
-          {
-            id: "loops",
-            title: "For and While Loops",
-            description: "Understand iteration and repetition in Python",
-            duration: "60 min",
-            type: "video",
-            isCompleted: false,
-            isLocked: true
-          }
-        ]
-      }
-    ]
-  },
-  "ethical-hacking": {
-    title: "Ethical Hacking Foundations",
-    description: "Learn cybersecurity fundamentals through hands-on penetration testing scenarios.",
-    category: "cybersecurity",
-    difficulty: "Intermediate",
-    duration: "12 weeks",
-    students: 8934,
-    rating: 4.9,
-    progress: 0,
-    modules: [
-      {
-        id: "recon",
-        title: "Reconnaissance & Information Gathering",
-        description: "Learn how to gather information about targets legally and ethically",
-        duration: "4 hours",
-        steps: [
-          {
-            id: "passive-recon",
-            title: "Passive Reconnaissance",
-            description: "Gather information without directly interacting with the target",
-            duration: "90 min",
-            type: "video",
-            isCompleted: false,
-            isLocked: false
-          },
-          {
-            id: "active-recon",
-            title: "Active Reconnaissance",
-            description: "Direct information gathering techniques",
-            duration: "120 min",
-            type: "practice",
-            isCompleted: false,
-            isLocked: false
-          }
-        ]
-      }
-    ]
-  }
-};
+interface CourseStep {
+  id: string;
+  title: string;
+  content: string;
+  step_type: string;
+  video_url?: string;
+  order_index: number;
+  requires_submission: boolean;
+  isCompleted: boolean;
+  isLocked: boolean;
+}
 
-const CourseDetail = () => {
-  const { courseId } = useParams();
+export default function CourseDetail() {
+  const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("overview");
-  
-  const course = courseData[courseId || ""];
-  
-  if (!course) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Course not found</h1>
-          <Button onClick={() => navigate("/")}>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Dashboard
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  const { user } = useAuth();
+  const { markStepComplete, getUserProgress } = useProgressTracker();
+  const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState('overview');
+  const [course, setCourse] = useState<Course | null>(null);
+  const [userProgress, setUserProgress] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const totalSteps = course.modules.reduce((acc: number, module: CourseModule) => acc + module.steps.length, 0);
-  const completedSteps = course.modules.reduce(
-    (acc: number, module: CourseModule) => acc + module.steps.filter((step: CourseStep) => step.isCompleted).length,
-    0
-  );
-  const progressPercentage = totalSteps > 0 ? (completedSteps / totalSteps) * 100 : 0;
+  useEffect(() => {
+    if (courseId) {
+      fetchCourseData(courseId);
+      if (user) {
+        fetchUserProgress(courseId);
+      }
+    }
+  }, [courseId, user]);
+
+  const fetchCourseData = async (id: string) => {
+    try {
+      setLoading(true);
+      
+      // Fetch course data
+      const { data: courseData, error: courseError } = await supabase
+        .from('courses')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (courseError) throw courseError;
+
+      // Fetch modules for this course
+      const { data: modulesData, error: modulesError } = await supabase
+        .from('modules')
+        .select('*')
+        .eq('course_id', id)
+        .order('order_index');
+
+      if (modulesError) throw modulesError;
+
+      // Fetch steps for each module
+      const modulesWithSteps = await Promise.all(
+        (modulesData || []).map(async (module) => {
+          const { data: stepsData, error: stepsError } = await supabase
+            .from('steps')
+            .select('*')
+            .eq('module_id', module.id)
+            .order('order_index');
+
+          if (stepsError) throw stepsError;
+
+          return {
+            ...module,
+            steps: (stepsData || []).map(step => ({
+              ...step,
+              content: step.content || '',
+              video_url: step.video_url || '',
+              requires_submission: step.requires_submission || false,
+              isCompleted: false, // Will be updated with actual progress
+              isLocked: false // Will be calculated based on progress
+            }))
+          };
+        })
+      );
+
+      setCourse({
+        ...courseData,
+        rating: "4.8", // Mock rating for now
+        progress: 0, // Will be calculated based on user progress
+        modules: modulesWithSteps
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error loading course",
+        description: error.message,
+        variant: "destructive",
+      });
+      console.error('Error fetching course:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchUserProgress = async (courseId: string) => {
+    try {
+      const progress = await getUserProgress(courseId);
+      setUserProgress(progress || []);
+      
+      // Update course and step completion status based on progress
+      if (course && progress) {
+        const completedStepIds = new Set(progress.filter(p => p.completed).map(p => p.step_id));
+        
+        const updatedModules = course.modules.map(module => ({
+          ...module,
+          steps: module.steps.map(step => ({
+            ...step,
+            isCompleted: completedStepIds.has(step.id)
+          }))
+        }));
+        
+        const totalSteps = updatedModules.reduce((acc, module) => acc + module.steps.length, 0);
+        const completedSteps = progress.filter(p => p.completed).length;
+        const progressPercentage = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
+        
+        setCourse(prev => prev ? { 
+          ...prev, 
+          progress: progressPercentage,
+          modules: updatedModules
+        } : null);
+      }
+    } catch (error: any) {
+      console.error('Error fetching user progress:', error);
+    }
+  };
+
+  const handleStepComplete = async (stepId: string) => {
+    if (!courseId) return;
+    
+    const success = await markStepComplete(stepId, courseId);
+    if (success) {
+      // Refresh progress data
+      await fetchUserProgress(courseId);
+    }
+  };
 
   const getCategoryColor = (category: string) => {
     const colors = {
-      coding: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-      cybersecurity: "bg-red-500/20 text-red-400 border-red-500/30",
-      ai: "bg-purple-500/20 text-purple-400 border-purple-500/30",
+      programming: "bg-blue-500/20 text-blue-400 border-blue-500/30",
       design: "bg-pink-500/20 text-pink-400 border-pink-500/30",
-      business: "bg-green-500/20 text-green-400 border-green-500/30"
+      marketing: "bg-purple-500/20 text-purple-400 border-purple-500/30",
+      business: "bg-green-500/20 text-green-400 border-green-500/30",
+      science: "bg-red-500/20 text-red-400 border-red-500/30",
+      mathematics: "bg-orange-500/20 text-orange-400 border-orange-500/30"
     };
-    return colors[category as keyof typeof colors] || colors.coding;
+    return colors[category as keyof typeof colors] || colors.programming;
   };
 
   const getStepIcon = (type: string, isCompleted: boolean, isLocked: boolean) => {
@@ -184,11 +201,45 @@ const CourseDetail = () => {
     if (isCompleted) return <CheckCircle className="h-4 w-4 text-green-400" />;
     
     switch (type) {
-      case "video": return <Play className="h-4 w-4 text-primary" />;
-      case "practice": return <Award className="h-4 w-4 text-primary" />;
-      default: return <Play className="h-4 w-4 text-primary" />;
+      case "video": return <Video className="h-4 w-4 text-primary" />;
+      case "quiz": return <Award className="h-4 w-4 text-primary" />;
+      case "assignment": return <FileText className="h-4 w-4 text-primary" />;
+      default: return <BookOpen className="h-4 w-4 text-primary" />;
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-pulse space-y-4">
+            <div className="h-8 bg-muted rounded w-64 mx-auto"></div>
+            <div className="h-4 bg-muted rounded w-96 mx-auto"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!course) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center text-center p-4">
+        <h1 className="text-2xl font-bold mb-4">Course not found</h1>
+        <p className="text-muted-foreground mb-6">The course you're looking for doesn't exist or has been removed.</p>
+        <Button onClick={() => navigate('/')} variant="outline">
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Back to Dashboard
+        </Button>
+      </div>
+    );
+  }
+
+  const totalSteps = course.modules.reduce((acc, module) => acc + module.steps.length, 0);
+  const completedSteps = course.modules.reduce(
+    (acc, module) => acc + module.steps.filter(step => step.isCompleted).length,
+    0
+  );
+  const progressPercentage = totalSteps > 0 ? (completedSteps / totalSteps) * 100 : 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -214,19 +265,19 @@ const CourseDetail = () => {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <div className="flex items-center gap-2">
               <Clock className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm">{course.duration}</span>
+              <span className="text-sm">{course.duration || 'Self-paced'}</span>
             </div>
             <div className="flex items-center gap-2">
               <Users className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm">{course.students.toLocaleString()} students</span>
+              <span className="text-sm">{course.student_count} students</span>
             </div>
             <div className="flex items-center gap-2">
               <Star className="h-4 w-4 text-yellow-400" />
-              <span className="text-sm">{course.rating}/5</span>
+              <span className="text-sm">{course.rating || '4.8'}/5</span>
             </div>
             <div className="flex items-center gap-2">
               <Award className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm">{course.difficulty}</span>
+              <span className="text-sm capitalize">{course.difficulty}</span>
             </div>
           </div>
 
@@ -253,6 +304,17 @@ const CourseDetail = () => {
           <TabsContent value="overview" className="space-y-6">
             <Card>
               <CardHeader>
+                <CardTitle>About this course</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground leading-relaxed">
+                  {course.description}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
                 <CardTitle>What you'll learn</CardTitle>
               </CardHeader>
               <CardContent>
@@ -271,21 +333,8 @@ const CourseDetail = () => {
                   </li>
                   <li className="flex items-start gap-2">
                     <CheckCircle className="h-5 w-5 text-green-400 mt-0.5 flex-shrink-0" />
-                    <span>Prepare for professional certifications</span>
+                    <span>Prepare for professional applications</span>
                   </li>
-                </ul>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Course Requirements</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2 text-muted-foreground">
-                  <li>• Basic computer literacy</li>
-                  <li>• Access to a computer with internet connection</li>
-                  <li>• No prior experience required</li>
                 </ul>
               </CardContent>
             </Card>
@@ -293,7 +342,7 @@ const CourseDetail = () => {
 
           <TabsContent value="curriculum" className="space-y-6">
             <div className="space-y-4">
-              {course.modules.map((module: CourseModule, moduleIndex: number) => (
+              {course.modules.map((module, moduleIndex) => (
                 <Card key={module.id}>
                   <CardHeader>
                     <div className="flex items-center justify-between">
@@ -303,7 +352,7 @@ const CourseDetail = () => {
                         </CardTitle>
                         <CardDescription>{module.description}</CardDescription>
                       </div>
-                      <Badge variant="secondary">{module.duration}</Badge>
+                      <Badge variant="secondary">{module.steps.length} steps</Badge>
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -314,7 +363,7 @@ const CourseDetail = () => {
                         </AccordionTrigger>
                         <AccordionContent>
                           <div className="space-y-3 pt-4">
-                            {module.steps.map((step: CourseStep, stepIndex: number) => (
+                            {module.steps.map((step, stepIndex) => (
                               <div
                                 key={step.id}
                                 className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
@@ -322,20 +371,36 @@ const CourseDetail = () => {
                                     ? "bg-muted/30 border-muted" 
                                     : "bg-card border-border hover:bg-muted/50 cursor-pointer"
                                 }`}
+                                onClick={() => {
+                                  if (!step.isLocked && !step.isCompleted && user) {
+                                    handleStepComplete(step.id);
+                                  }
+                                }}
                               >
-                                {getStepIcon(step.type, step.isCompleted, step.isLocked)}
+                                {getStepIcon(step.step_type, step.isCompleted, step.isLocked)}
                                 <div className="flex-1">
                                   <div className="flex items-center gap-2">
                                     <h4 className={`font-medium ${step.isLocked ? "text-muted-foreground" : "text-foreground"}`}>
                                       {stepIndex + 1}. {step.title}
                                     </h4>
-                                    <Badge variant="outline" className="text-xs">
-                                      {step.type}
+                                    <Badge variant="outline" className="text-xs capitalize">
+                                      {step.step_type}
                                     </Badge>
+                                    {step.requires_submission && (
+                                      <Badge variant="secondary" className="text-xs">
+                                        Submission Required
+                                      </Badge>
+                                    )}
                                   </div>
-                                  <p className="text-sm text-muted-foreground">{step.description}</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    {step.content || 'No description available'}
+                                  </p>
                                 </div>
-                                <span className="text-sm text-muted-foreground">{step.duration}</span>
+                                {!step.isCompleted && !step.isLocked && user && (
+                                  <Button size="sm" variant="outline">
+                                    Mark Complete
+                                  </Button>
+                                )}
                               </div>
                             ))}
                           </div>
@@ -356,20 +421,20 @@ const CourseDetail = () => {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="p-4 border rounded-lg">
-                    <h4 className="font-medium mb-2">Documentation</h4>
-                    <p className="text-sm text-muted-foreground">Official documentation and references</p>
+                    <h4 className="font-medium mb-2">Course Materials</h4>
+                    <p className="text-sm text-muted-foreground">Downloadable resources and references</p>
                   </div>
                   <div className="p-4 border rounded-lg">
-                    <h4 className="font-medium mb-2">Practice Labs</h4>
-                    <p className="text-sm text-muted-foreground">Interactive coding environments</p>
+                    <h4 className="font-medium mb-2">Practice Exercises</h4>
+                    <p className="text-sm text-muted-foreground">Interactive coding and practical exercises</p>
                   </div>
                   <div className="p-4 border rounded-lg">
-                    <h4 className="font-medium mb-2">Community</h4>
-                    <p className="text-sm text-muted-foreground">Connect with other learners</p>
+                    <h4 className="font-medium mb-2">Discussion Forum</h4>
+                    <p className="text-sm text-muted-foreground">Connect with instructors and other students</p>
                   </div>
                   <div className="p-4 border rounded-lg">
                     <h4 className="font-medium mb-2">Certificates</h4>
-                    <p className="text-sm text-muted-foreground">Downloadable completion certificates</p>
+                    <p className="text-sm text-muted-foreground">Completion certificates upon finishing</p>
                   </div>
                 </div>
               </CardContent>
@@ -379,6 +444,4 @@ const CourseDetail = () => {
       </div>
     </div>
   );
-};
-
-export default CourseDetail;
+}

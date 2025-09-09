@@ -77,7 +77,7 @@ export function Dashboard({ userRole, userName, subscriptionTier }: DashboardPro
         duration: course.duration || "Not specified",
         difficulty: course.difficulty || "Beginner",
         category: course.category || "general",
-        students: Math.floor(Math.random() * 10000) + 1000, // Mock data
+        students: course.student_count || 0, // Use real student count
         rating: (Math.random() * 0.5 + 4.5).toFixed(1), // Mock rating between 4.5-5.0
         progress: Math.floor(Math.random() * 100), // Mock progress
         isLocked: course.is_premium && userSubscriptionTier !== 'premium' && userSubscriptionTier !== 'teacher'
@@ -196,28 +196,28 @@ export function Dashboard({ userRole, userName, subscriptionTier }: DashboardPro
               <CardTitle className="text-sm font-medium text-muted-foreground">Courses in Progress</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">3</div>
-              <p className="text-sm text-muted-foreground">+2 from last week</p>
+              <div className="text-2xl font-bold">{filteredCourses.filter(c => c.progress > 0 && c.progress < 100).length}</div>
+              <p className="text-sm text-muted-foreground">Active learning</p>
             </CardContent>
           </Card>
           
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Total Study Time</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">Available Courses</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">47h</div>
-              <p className="text-sm text-muted-foreground">This month</p>
+              <div className="text-2xl font-bold">{courses.length}</div>
+              <p className="text-sm text-muted-foreground">Ready to learn</p>
             </CardContent>
           </Card>
           
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Certificates Earned</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">Completed Courses</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">2</div>
-              <p className="text-sm text-muted-foreground">Python & Machine Learning</p>
+              <div className="text-2xl font-bold">{filteredCourses.filter(c => c.progress === 100).length}</div>
+              <p className="text-sm text-muted-foreground">Finished learning</p>
             </CardContent>
           </Card>
         </div>

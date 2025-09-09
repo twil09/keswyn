@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/hooks/useAuth';
 import { CourseManager } from './CourseManager';
+import { CourseEditor } from './CourseEditor';
 import { SubmissionManager } from './SubmissionManager';
 import { UserManager } from './UserManager';
 import { BookOpen, Users, FileText, LogOut } from 'lucide-react';
@@ -71,14 +72,19 @@ export function AdminDashboard() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="courses">Course Management</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="courses">Course Manager</TabsTrigger>
+            <TabsTrigger value="editor">Course Editor</TabsTrigger>
             <TabsTrigger value="submissions">Submissions</TabsTrigger>
             <TabsTrigger value="users">User Management</TabsTrigger>
           </TabsList>
           
           <TabsContent value="courses" className="space-y-4">
             <CourseManager />
+          </TabsContent>
+          
+          <TabsContent value="editor" className="space-y-4">
+            <CourseEditor />
           </TabsContent>
           
           <TabsContent value="submissions" className="space-y-4">
