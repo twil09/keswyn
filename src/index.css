@@ -119,4 +119,21 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  /* High contrast mode */
+  .high-contrast {
+    --background: 0 0% 0%;
+    --foreground: 0 0% 100%;
+    --card: 0 0% 5%;
+    --card-foreground: 0 0% 100%;
+    --muted: 0 0% 10%;
+    --muted-foreground: 0 0% 90%;
+    --border: 0 0% 40%;
+    --primary: 210 100% 70%;
+    --primary-foreground: 0 0% 0%;
+  }
+  
+  .high-contrast * {
+    border-color: hsl(var(--border)) !important;
+  }
 }

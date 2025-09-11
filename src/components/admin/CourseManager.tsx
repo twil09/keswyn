@@ -106,12 +106,29 @@ export function CourseManager() {
     }
 
     const bucket = type === 'video' ? 'course-videos' : 'course-resources';
-    const fileName = `${selectedCourse}/${Date.now()}-${file.name}`;
+    // Use timestamp and random string to avoid filename conflicts
+    const timestamp = Date.now();
+    const randomSuffix = Math.random().toString(36).substring(2, 8);
+    const fileName = `${selectedCourse}/${timestamp}-${randomSuffix}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
 
     try {
+      // Check if file already exists and remove if needed
+      const { data: existingFiles } = await supabase.storage
+        .from(bucket)
+        .list(selectedCourse);
+      
+      const conflictingFile = existingFiles?.find(f => f.name === fileName.split('/')[1]);
+      if (conflictingFile) {
+        await supabase.storage
+          .from(bucket)
+          .remove([`${selectedCourse}/${conflictingFile.name}`]);
+      }
+
       const { error: uploadError } = await supabase.storage
         .from(bucket)
-        .upload(fileName, file);
+        .upload(fileName, file, {
+          upsert: true // Allow overwriting
+        });
 
       if (uploadError) throw uploadError;
 

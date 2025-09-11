@@ -68,19 +68,59 @@ export function Dashboard({ userRole, userName, subscriptionTier }: DashboardPro
         }
         throw error;
       }
+
+      // Get user's progress data in parallel
+      let userProgressMap = new Map();
+      try {
+        const { data: progressData } = await supabase
+          .from('user_progress')
+          .select('step_id, completed');
+        
+        userProgressMap = new Map(
+          (progressData || []).map(p => [p.step_id, p.completed])
+        );
+      } catch (progressError) {
+        console.warn('Could not fetch progress data:', progressError);
+      }
       
       // Transform database courses to match the expected format
-      const transformedCourses = (data || []).map(course => ({
-        id: course.id,
-        title: course.title,
-        description: course.description || "",
-        duration: course.duration || "Not specified",
-        difficulty: course.difficulty || "Beginner",
-        category: course.category || "general",
-        students: course.student_count || 0, // Use real student count
-        rating: (Math.random() * 0.5 + 4.5).toFixed(1), // Mock rating between 4.5-5.0
-        progress: Math.floor(Math.random() * 100), // Mock progress
-        isLocked: course.is_premium && userSubscriptionTier !== 'premium' && userSubscriptionTier !== 'teacher'
+      const transformedCourses = await Promise.all((data || []).map(async course => {
+        let progress = 0;
+        
+        // Calculate real progress from user_progress table
+        try {
+          const { data: modules } = await supabase
+            .from('modules')
+            .select('id')
+            .eq('course_id', course.id);
+            
+          if (modules?.length) {
+            const { data: steps } = await supabase
+              .from('steps')
+              .select('id')
+              .in('module_id', modules.map(m => m.id));
+              
+            if (steps?.length) {
+              const completedSteps = steps.filter(step => userProgressMap.get(step.id) === true);
+              progress = Math.round((completedSteps.length / steps.length) * 100);
+            }
+          }
+        } catch (progressCalcError) {
+          console.warn('Could not calculate progress for course', course.id, progressCalcError);
+        }
+
+        return {
+          id: course.id,
+          title: course.title,
+          description: course.description || "",
+          duration: course.duration || "Not specified",
+          difficulty: course.difficulty || "Beginner",
+          category: course.category || "general",
+          students: course.student_count || 0,
+          rating: (Math.random() * 0.5 + 4.5).toFixed(1), // Mock rating between 4.5-5.0
+          progress,
+          isLocked: course.is_premium && userSubscriptionTier !== 'premium' && userSubscriptionTier !== 'teacher'
+        };
       }));
       
       setCourses(transformedCourses);
@@ -196,7 +236,7 @@ export function Dashboard({ userRole, userName, subscriptionTier }: DashboardPro
               <CardTitle className="text-sm font-medium text-muted-foreground">Courses in Progress</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{filteredCourses.filter(c => c.progress > 0 && c.progress < 100).length}</div>
+              <div className="text-2xl font-bold">{courses.filter(c => c.progress > 0 && c.progress < 100).length}</div>
               <p className="text-sm text-muted-foreground">Active learning</p>
             </CardContent>
           </Card>
@@ -216,7 +256,7 @@ export function Dashboard({ userRole, userName, subscriptionTier }: DashboardPro
               <CardTitle className="text-sm font-medium text-muted-foreground">Completed Courses</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{filteredCourses.filter(c => c.progress === 100).length}</div>
+              <div className="text-2xl font-bold">{courses.filter(c => c.progress === 100).length}</div>
               <p className="text-sm text-muted-foreground">Finished learning</p>
             </CardContent>
           </Card>

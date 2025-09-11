@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -29,6 +30,31 @@ export function SettingsMenu({ isOpen, onClose }: SettingsMenuProps) {
   const [fontSize, setFontSize] = useState([16]);
   const [highContrast, setHighContrast] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
+
+  // Apply accessibility settings to document when they change
+  const applyAccessibilitySettings = (fontSizeValue: number, contrastEnabled: boolean) => {
+    document.documentElement.style.fontSize = `${fontSizeValue}px`;
+    if (contrastEnabled) {
+      document.documentElement.classList.add('high-contrast');
+    } else {
+      document.documentElement.classList.remove('high-contrast');
+    }
+  };
+
+  // Apply settings when component mounts or values change
+  React.useEffect(() => {
+    applyAccessibilitySettings(fontSize[0], highContrast);
+  }, [fontSize, highContrast]);
+
+  const handleFontSizeChange = (newSize: number[]) => {
+    setFontSize(newSize);
+    applyAccessibilitySettings(newSize[0], highContrast);
+  };
+
+  const handleContrastChange = (enabled: boolean) => {
+    setHighContrast(enabled);
+    applyAccessibilitySettings(fontSize[0], enabled);
+  };
 
   const handleSignOut = async () => {
     await signOut();
@@ -116,7 +142,7 @@ export function SettingsMenu({ isOpen, onClose }: SettingsMenuProps) {
                 </div>
                 <Switch
                   checked={highContrast}
-                  onCheckedChange={setHighContrast}
+                  onCheckedChange={handleContrastChange}
                 />
               </div>
               
@@ -127,7 +153,7 @@ export function SettingsMenu({ isOpen, onClose }: SettingsMenuProps) {
                 </div>
                 <Slider
                   value={fontSize}
-                  onValueChange={setFontSize}
+                  onValueChange={handleFontSizeChange}
                   min={12}
                   max={24}
                   step={1}
