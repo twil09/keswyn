@@ -266,6 +266,48 @@ export type Database = {
           },
         ]
       }
+      role_change_requests: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          id: string
+          new_role: Database["public"]["Enums"]["app_role"]
+          requested_by: string
+          requester_email: string
+          status: string
+          target_email: string
+          target_user_id: string
+          verification_token: string | null
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          id?: string
+          new_role: Database["public"]["Enums"]["app_role"]
+          requested_by: string
+          requester_email: string
+          status?: string
+          target_email: string
+          target_user_id: string
+          verification_token?: string | null
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          id?: string
+          new_role?: Database["public"]["Enums"]["app_role"]
+          requested_by?: string
+          requester_email?: string
+          status?: string
+          target_email?: string
+          target_user_id?: string
+          verification_token?: string | null
+        }
+        Relationships: []
+      }
       steps: {
         Row: {
           content: string | null
@@ -457,6 +499,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      approve_role_change: {
+        Args: { _approval_email: string; _request_id: string }
+        Returns: boolean
+      }
       can_access_class: {
         Args: { _class_id: string; _user_id: string }
         Returns: boolean
@@ -485,6 +531,14 @@ export type Database = {
           subscription_tier: string
           updated_at: string
           user_id: string
+        }[]
+      }
+      get_user_subscription_secure: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          subscribed: boolean
+          subscription_end: string
+          subscription_tier: string
         }[]
       }
       get_user_subscription_status: {
@@ -518,12 +572,28 @@ export type Database = {
         Args: { _user_id: string }
         Returns: boolean
       }
+      request_role_change: {
+        Args: {
+          _new_role: Database["public"]["Enums"]["app_role"]
+          _requested_by: string
+          _target_user_id: string
+        }
+        Returns: string
+      }
+      set_admin_pin: {
+        Args: { pin_text: string }
+        Returns: boolean
+      }
       update_course_completion_rate: {
         Args: { _course_id: string }
         Returns: undefined
       }
       verify_admin_pin: {
         Args: { hashed_pin: string; pin_text: string }
+        Returns: boolean
+      }
+      verify_admin_pin_secure: {
+        Args: { pin_text: string }
         Returns: boolean
       }
     }
