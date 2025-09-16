@@ -80,25 +80,46 @@ export function UserManager() {
     }
   };
 
-  const updateUserRole = async (userId: string, newRole: 'admin' | 'teacher' | 'student') => {
+  const requestRoleChange = async (userId: string, newRole: 'admin' | 'teacher' | 'student') => {
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ role: newRole })
-        .eq('id', userId);
+      // Get current user to identify the requester
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      // Request the role change using the secure function
+      const { data: requestId, error } = await supabase
+        .rpc('request_role_change', {
+          _target_user_id: userId,
+          _new_role: newRole,
+          _requested_by: user.id
+        });
 
       if (error) throw error;
 
-      toast({
-        title: "Role updated",
-        description: `User role has been updated to ${newRole}.`,
+      // Send the email notification
+      const { error: emailError } = await supabase.functions.invoke('send-role-change-email', {
+        body: { requestId }
       });
 
-      fetchProfiles();
+      if (emailError) {
+        // Don't fail the whole request if email fails, just warn
+        console.warn('Email notification failed:', emailError);
+        toast({
+          title: "Role change requested",
+          description: `Role change request submitted (email notification failed: ${emailError.message})`,
+          variant: "default",
+        });
+      } else {
+        toast({
+          title: "Role change requested",
+          description: `Role change request has been submitted and verification emails have been sent to authorized approvers.`,
+        });
+      }
+
       setSelectedUser(null);
     } catch (error: any) {
       toast({
-        title: "Error updating role",
+        title: "Error requesting role change",
         description: error.message,
         variant: "destructive",
       });
@@ -226,9 +247,9 @@ export function UserManager() {
                       </DialogTrigger>
                       <DialogContent>
                         <DialogHeader>
-                          <DialogTitle>Update User Role</DialogTitle>
+                          <DialogTitle>Request Role Change</DialogTitle>
                           <DialogDescription>
-                            Change the role for {profile.full_name || profile.email}
+                            Request a role change for {profile.full_name || profile.email}. This will send a verification email to authorized approvers.
                           </DialogDescription>
                         </DialogHeader>
                         
@@ -243,14 +264,17 @@ export function UserManager() {
 
                           <div className="space-y-2">
                             <p className="text-sm font-medium">New Role:</p>
-                            <Select onValueChange={(value) => updateUserRole(profile.id, value as 'admin' | 'teacher' | 'student')}>
+                            <Select onValueChange={(value) => requestRoleChange(profile.user_id, value as 'admin' | 'teacher' | 'student')}>
                               <SelectTrigger>
                                 <SelectValue placeholder="Select new role" />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="student">Student</SelectItem>
-                                <SelectItem value="teacher">Teacher</SelectItem>
+                                <SelectItem value="free_student">Free Student</SelectItem>
+                                <SelectItem value="premium_student">Premium Student</SelectItem>
+                                <SelectItem value="free_teacher">Free Teacher</SelectItem>
+                                <SelectItem value="premium_teacher">Premium Teacher</SelectItem>
                                 <SelectItem value="admin">Admin</SelectItem>
+                                <SelectItem value="super_admin">Super Admin</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
