@@ -46,7 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               const role = profile?.role || 'free_student';
               setUserRole(role);
               setSubscriptionTier(profile?.subscription_tier || 'free');
-              setIsAdmin(role === 'super_admin' || role === 'admin');
+              setIsAdmin(role === 'owner' || role === 'super_admin' || role === 'admin');
               
               // Check subscription status using secure function
               await checkSubscriptionSecurely();
@@ -172,7 +172,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Update role if subscription tier has changed
         const newRole = data.subscription_tier;
         setUserRole(newRole);
-        setIsAdmin(newRole === 'super_admin' || newRole === 'admin');
+        setIsAdmin(newRole === 'owner' || newRole === 'super_admin' || newRole === 'admin');
       }
     } catch (error) {
       console.error('Error checking subscription:', error);

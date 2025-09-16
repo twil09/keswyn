@@ -16,7 +16,7 @@ export default function Admin() {
     return <Navigate to="/auth" replace />;
   }
 
-  if (userRole !== 'super_admin' && userRole !== 'admin' && userRole !== 'premium_teacher' && userRole !== 'free_teacher') {
+  if (userRole !== 'owner' && userRole !== 'super_admin') {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">

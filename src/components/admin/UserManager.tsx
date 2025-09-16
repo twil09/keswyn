@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Users, UserCheck, Shield } from 'lucide-react';
+import { Users, UserCheck, Shield, Mail } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -22,6 +22,7 @@ export function UserManager() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
+  const [sendingTestEmail, setSendingTestEmail] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -126,6 +127,35 @@ export function UserManager() {
     }
   };
 
+  const sendTestEmail = async () => {
+    setSendingTestEmail(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { data, error } = await supabase.functions.invoke('send-test-role-email', {
+        headers: {
+          Authorization: `Bearer ${await supabase.auth.getSession().then(({ data }) => data.session?.access_token)}`,
+        },
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Test email sent",
+        description: "A test role change email has been sent to your email address.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error sending test email",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setSendingTestEmail(false);
+    }
+  };
+
   const getRoleColor = (role: string) => {
     switch (role) {
       case 'admin':
@@ -158,9 +188,20 @@ export function UserManager() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold">User Management</h2>
-        <p className="text-muted-foreground">Manage user roles and permissions</p>
+      <div className="flex justify-between items-start">
+        <div>
+          <h2 className="text-2xl font-bold">User Management</h2>
+          <p className="text-muted-foreground">Manage user roles and permissions</p>
+        </div>
+        <Button
+          onClick={sendTestEmail}
+          disabled={sendingTestEmail}
+          variant="outline"
+          size="sm"
+        >
+          <Mail className="w-4 h-4 mr-2" />
+          {sendingTestEmail ? 'Sending...' : 'Send Test Email'}
+        </Button>
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
@@ -275,6 +316,7 @@ export function UserManager() {
                                 <SelectItem value="premium_teacher">Premium Teacher</SelectItem>
                                 <SelectItem value="admin">Admin</SelectItem>
                                 <SelectItem value="super_admin">Super Admin</SelectItem>
+                                <SelectItem value="owner">Owner</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>

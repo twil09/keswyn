@@ -42,11 +42,22 @@ serve(async (req) => {
     logStep("User authenticated", { userId: user.id, email: user.email });
 
     const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
-    const customers = await stripe.customers.list({ email: user.email, limit: 1 });
+    let customers = await stripe.customers.list({ email: user.email, limit: 1 });
+    let customerId;
+    
     if (customers.data.length === 0) {
-      throw new Error("No Stripe customer found for this user");
+      // Create a new customer if none exists
+      logStep("Creating new Stripe customer", { email: user.email });
+      const customer = await stripe.customers.create({
+        email: user.email,
+        metadata: {
+          user_id: user.id
+        }
+      });
+      customerId = customer.id;
+    } else {
+      customerId = customers.data[0].id;
     }
-    const customerId = customers.data[0].id;
     logStep("Found Stripe customer", { customerId });
 
     const origin = req.headers.get("origin") || "http://localhost:3000";
