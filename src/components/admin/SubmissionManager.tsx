@@ -118,9 +118,20 @@ export function SubmissionManager() {
 
   const downloadFile = async (fileUrl: string, fileName: string) => {
     try {
-      // Extract the file path from the URL
-      const urlParts = fileUrl.split('/');
-      const filePath = urlParts[urlParts.length - 1];
+      // Extract the full file path from the storage URL
+      // The URL format is: https://[project].supabase.co/storage/v1/object/public/submissions/[full_path]
+      // or https://[project].supabase.co/storage/v1/object/sign/submissions/[full_path]?token=...
+      const url = new URL(fileUrl);
+      const pathParts = url.pathname.split('/');
+      
+      // Find the index where 'submissions' appears and get everything after it
+      const submissionsIndex = pathParts.findIndex(part => part === 'submissions');
+      if (submissionsIndex === -1) {
+        throw new Error('Invalid file URL format');
+      }
+      
+      // Get the full path after 'submissions/'
+      const filePath = pathParts.slice(submissionsIndex + 1).join('/');
       
       const { data, error } = await supabase.storage
         .from('submissions')
@@ -129,14 +140,14 @@ export function SubmissionManager() {
       if (error) throw error;
 
       // Create download link
-      const url = window.URL.createObjectURL(data);
+      const url2 = window.URL.createObjectURL(data);
       const a = document.createElement('a');
       a.style.display = 'none';
-      a.href = url;
+      a.href = url2;
       a.download = fileName || 'submission-file';
       document.body.appendChild(a);
       a.click();
-      window.URL.revokeObjectURL(url);
+      window.URL.revokeObjectURL(url2);
       document.body.removeChild(a);
 
       toast({
@@ -144,6 +155,7 @@ export function SubmissionManager() {
         description: "The submission file has been downloaded.",
       });
     } catch (error: any) {
+      console.error('Download error:', error);
       toast({
         title: "Download failed",
         description: error.message,
