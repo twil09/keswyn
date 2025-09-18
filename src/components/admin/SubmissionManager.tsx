@@ -19,6 +19,7 @@ interface Submission {
   grade: number | null;
   feedback: string | null;
   submitted_at: string;
+  reviewed_at: string | null;
   student: {
     full_name: string;
     email: string;
@@ -99,9 +100,29 @@ export function SubmissionManager() {
 
       if (error) throw error;
 
+      // Send email notification
+      if (selectedSubmission) {
+        try {
+          await supabase.functions.invoke('send-submission-feedback', {
+            body: {
+              studentEmail: selectedSubmission.student.email,
+              studentName: selectedSubmission.student.full_name,
+              stepTitle: selectedSubmission.step.title,
+              courseTitle: selectedSubmission.step.module.course.title,
+              grade: reviewData.grade,
+              feedback: reviewData.feedback,
+              status: status
+            }
+          });
+        } catch (emailError) {
+          console.error('Error sending email:', emailError);
+          // Don't fail the whole operation if email fails
+        }
+      }
+
       toast({
         title: "Submission reviewed",
-        description: `Submission has been ${status} with grade ${reviewData.grade}.`,
+        description: `Submission has been ${status} with grade ${reviewData.grade}. Email notification sent.`,
       });
 
       setSelectedSubmission(null);
@@ -262,7 +283,11 @@ export function SubmissionManager() {
 
                   <div className="flex items-center justify-between">
                     <p className="text-sm text-muted-foreground">
-                      Submitted on {new Date(submission.submitted_at).toLocaleDateString()}
+                      {submission.status === 'approved' && submission.reviewed_at ? (
+                        <>Reviewed on {new Date(submission.reviewed_at).toLocaleDateString()}</>
+                      ) : (
+                        <>Submitted on {new Date(submission.submitted_at).toLocaleDateString()}</>
+                      )}
                     </p>
                     {submission.status === 'pending' && (
                       <Button

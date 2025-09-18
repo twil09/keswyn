@@ -32,17 +32,38 @@ export function ProgressTracker({
 
       if (profileError) throw profileError;
 
-      // Mark step as complete
-      const { error: progressError } = await supabase
+      // Check if progress already exists
+      const { data: existingProgress } = await supabase
         .from('user_progress')
-        .upsert({
-          user_id: profile.id,
-          step_id: stepId,
-          completed: true,
-          completed_at: new Date().toISOString()
-        });
+        .select('id, completed')
+        .eq('user_id', profile.id)
+        .eq('step_id', stepId)
+        .single();
 
-      if (progressError) throw progressError;
+      if (existingProgress) {
+        // Update existing progress
+        const { error: updateError } = await supabase
+          .from('user_progress')
+          .update({
+            completed: true,
+            completed_at: new Date().toISOString()
+          })
+          .eq('id', existingProgress.id);
+
+        if (updateError) throw updateError;
+      } else {
+        // Insert new progress record
+        const { error: insertError } = await supabase
+          .from('user_progress')
+          .insert({
+            user_id: profile.id,
+            step_id: stepId,
+            completed: true,
+            completed_at: new Date().toISOString()
+          });
+
+        if (insertError) throw insertError;
+      }
 
       // Check if user has completed all steps in the course
       await checkCourseCompletion(courseId, profile.id);
@@ -114,17 +135,38 @@ export const useProgressTracker = () => {
 
       if (profileError) throw profileError;
 
-      // Mark step as complete
-      const { error: progressError } = await supabase
+      // Check if progress already exists
+      const { data: existingProgress } = await supabase
         .from('user_progress')
-        .upsert({
-          user_id: profile.id,
-          step_id: stepId,
-          completed: true,
-          completed_at: new Date().toISOString()
-        });
+        .select('id, completed')
+        .eq('user_id', profile.id)
+        .eq('step_id', stepId)
+        .single();
 
-      if (progressError) throw progressError;
+      if (existingProgress) {
+        // Update existing progress
+        const { error: updateError } = await supabase
+          .from('user_progress')
+          .update({
+            completed: true,
+            completed_at: new Date().toISOString()
+          })
+          .eq('id', existingProgress.id);
+
+        if (updateError) throw updateError;
+      } else {
+        // Insert new progress record
+        const { error: insertError } = await supabase
+          .from('user_progress')
+          .insert({
+            user_id: profile.id,
+            step_id: stepId,
+            completed: true,
+            completed_at: new Date().toISOString()
+          });
+
+        if (insertError) throw insertError;
+      }
 
       // Update course completion rate if courseId provided
       if (courseId) {
