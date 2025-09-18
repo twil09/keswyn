@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { SubmissionDialog } from '@/components/SubmissionDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useProgressTracker } from '@/components/ProgressTracker';
@@ -21,7 +22,8 @@ import {
   Lock,
   FileText,
   Video,
-  Award
+  Award,
+  Upload
 } from 'lucide-react';
 
 interface Course {
@@ -67,12 +69,23 @@ export default function CourseDetail() {
   const [course, setCourse] = useState<Course | null>(null);
   const [userProgress, setUserProgress] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [submissionDialog, setSubmissionDialog] = useState<{
+    open: boolean;
+    stepId: string;
+    stepTitle: string;
+  }>({
+    open: false,
+    stepId: '',
+    stepTitle: ''
+  });
+  const [userSubmissions, setUserSubmissions] = useState<any[]>([]);
 
   useEffect(() => {
     if (courseId) {
       fetchCourseData(courseId);
       if (user) {
         fetchUserProgress(courseId);
+        fetchUserSubmissions(courseId);
       }
     }
   }, [courseId, user]);
@@ -174,6 +187,45 @@ export default function CourseDetail() {
     }
   };
 
+  const fetchUserSubmissions = async (courseId: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!profile) return;
+
+      const { data, error } = await supabase
+        .from('submissions')
+        .select(`
+          *,
+          step:steps(
+            id,
+            module:modules(
+              course_id
+            )
+          )
+        `)
+        .eq('student_id', profile.id);
+
+      if (error) throw error;
+
+      // Filter submissions for this course
+      const courseSubmissions = (data || []).filter(sub => 
+        sub.step?.module?.course_id === courseId
+      );
+
+      setUserSubmissions(courseSubmissions);
+    } catch (error: any) {
+      console.error('Error fetching user submissions:', error);
+    }
+  };
+
   const handleStepComplete = async (stepId: string) => {
     if (!courseId) return;
     
@@ -182,6 +234,29 @@ export default function CourseDetail() {
       // Refresh progress data
       await fetchUserProgress(courseId);
     }
+  };
+
+  const openSubmissionDialog = (stepId: string, stepTitle: string) => {
+    setSubmissionDialog({
+      open: true,
+      stepId,
+      stepTitle
+    });
+  };
+
+  const handleSubmissionComplete = () => {
+    if (courseId) {
+      fetchUserSubmissions(courseId);
+    }
+  };
+
+  const hasSubmission = (stepId: string) => {
+    return userSubmissions.some(sub => sub.step_id === stepId);
+  };
+
+  const getSubmissionStatus = (stepId: string) => {
+    const submission = userSubmissions.find(sub => sub.step_id === stepId);
+    return submission?.status || null;
   };
 
   const getCategoryColor = (category: string) => {
@@ -371,36 +446,68 @@ export default function CourseDetail() {
                                     ? "bg-muted/30 border-muted" 
                                     : "bg-card border-border hover:bg-muted/50 cursor-pointer"
                                 }`}
-                                onClick={() => {
-                                  if (!step.isLocked && !step.isCompleted && user) {
-                                    handleStepComplete(step.id);
-                                  }
-                                }}
+                                 onClick={() => {
+                                   if (!step.isLocked && !step.isCompleted && user) {
+                                     if (step.requires_submission && !hasSubmission(step.id)) {
+                                       openSubmissionDialog(step.id, step.title);
+                                     } else {
+                                       handleStepComplete(step.id);
+                                     }
+                                   }
+                                 }}
                               >
                                 {getStepIcon(step.step_type, step.isCompleted, step.isLocked)}
                                 <div className="flex-1">
-                                  <div className="flex items-center gap-2">
-                                    <h4 className={`font-medium ${step.isLocked ? "text-muted-foreground" : "text-foreground"}`}>
-                                      {stepIndex + 1}. {step.title}
-                                    </h4>
-                                    <Badge variant="outline" className="text-xs capitalize">
-                                      {step.step_type}
-                                    </Badge>
-                                    {step.requires_submission && (
-                                      <Badge variant="secondary" className="text-xs">
-                                        Submission Required
-                                      </Badge>
-                                    )}
-                                  </div>
+                                   <div className="flex items-center gap-2">
+                                     <h4 className={`font-medium ${step.isLocked ? "text-muted-foreground" : "text-foreground"}`}>
+                                       {stepIndex + 1}. {step.title}
+                                     </h4>
+                                     <Badge variant="outline" className="text-xs capitalize">
+                                       {step.step_type}
+                                     </Badge>
+                                     {step.requires_submission && (
+                                       <Badge variant="secondary" className="text-xs">
+                                         Submission Required
+                                       </Badge>
+                                     )}
+                                     {step.requires_submission && hasSubmission(step.id) && (
+                                       <Badge 
+                                         variant={
+                                           getSubmissionStatus(step.id) === 'approved' ? 'default' :
+                                           getSubmissionStatus(step.id) === 'rejected' ? 'destructive' :
+                                           'outline'
+                                         } 
+                                         className="text-xs"
+                                       >
+                                         {getSubmissionStatus(step.id) === 'approved' ? 'Approved' :
+                                          getSubmissionStatus(step.id) === 'rejected' ? 'Rejected' :
+                                          'Pending Review'}
+                                       </Badge>
+                                     )}
+                                   </div>
                                   <p className="text-sm text-muted-foreground">
                                     {step.content || 'No description available'}
                                   </p>
                                 </div>
-                                {!step.isCompleted && !step.isLocked && user && (
-                                  <Button size="sm" variant="outline">
-                                    Mark Complete
-                                  </Button>
-                                )}
+                                 {!step.isCompleted && !step.isLocked && user && (
+                                   <div className="flex gap-2">
+                                     {step.requires_submission && !hasSubmission(step.id) && (
+                                       <Button 
+                                         size="sm" 
+                                         variant="default"
+                                         onClick={() => openSubmissionDialog(step.id, step.title)}
+                                       >
+                                         <Upload className="h-3 w-3 mr-1" />
+                                         Submit Work
+                                       </Button>
+                                     )}
+                                     {(!step.requires_submission || hasSubmission(step.id)) && (
+                                       <Button size="sm" variant="outline">
+                                         Mark Complete
+                                       </Button>
+                                     )}
+                                   </div>
+                                 )}
                               </div>
                             ))}
                           </div>
@@ -442,6 +549,14 @@ export default function CourseDetail() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <SubmissionDialog
+        open={submissionDialog.open}
+        onOpenChange={(open) => setSubmissionDialog(prev => ({ ...prev, open }))}
+        stepId={submissionDialog.stepId}
+        stepTitle={submissionDialog.stepTitle}
+        onSubmissionComplete={handleSubmissionComplete}
+      />
     </div>
   );
 }

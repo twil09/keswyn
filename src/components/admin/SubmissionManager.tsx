@@ -5,8 +5,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Clock, CheckCircle, XCircle, FileText } from 'lucide-react';
+import { Clock, CheckCircle, XCircle, FileText, Download, Star } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -36,7 +37,7 @@ interface Submission {
 export function SubmissionManager() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
-  const [reviewData, setReviewData] = useState({ grade: '', feedback: '' });
+  const [reviewData, setReviewData] = useState({ grade: 'U', feedback: '' });
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -82,11 +83,14 @@ export function SubmissionManager() {
         .eq('user_id', (await supabase.auth.getUser()).data.user?.id)
         .single();
 
+      // Convert grade to number (U = null, 1-9 = number)
+      const gradeValue = reviewData.grade === 'U' ? null : parseInt(reviewData.grade);
+
       const { error } = await supabase
         .from('submissions')
         .update({
           status,
-          grade: reviewData.grade ? parseInt(reviewData.grade) : null,
+          grade: gradeValue,
           feedback: reviewData.feedback,
           reviewed_by: profile?.id,
           reviewed_at: new Date().toISOString()
@@ -97,11 +101,11 @@ export function SubmissionManager() {
 
       toast({
         title: "Submission reviewed",
-        description: `Submission has been ${status}.`,
+        description: `Submission has been ${status} with grade ${reviewData.grade}.`,
       });
 
       setSelectedSubmission(null);
-      setReviewData({ grade: '', feedback: '' });
+      setReviewData({ grade: 'U', feedback: '' });
       fetchSubmissions();
     } catch (error: any) {
       toast({
@@ -110,6 +114,47 @@ export function SubmissionManager() {
         variant: "destructive",
       });
     }
+  };
+
+  const downloadFile = async (fileUrl: string, fileName: string) => {
+    try {
+      // Extract the file path from the URL
+      const urlParts = fileUrl.split('/');
+      const filePath = urlParts[urlParts.length - 1];
+      
+      const { data, error } = await supabase.storage
+        .from('submissions')
+        .download(filePath);
+
+      if (error) throw error;
+
+      // Create download link
+      const url = window.URL.createObjectURL(data);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = fileName || 'submission-file';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: "File downloaded",
+        description: "The submission file has been downloaded.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Download failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const formatGrade = (grade: number | null) => {
+    if (grade === null) return 'U';
+    return grade.toString();
   };
 
   const getStatusIcon = (status: string) => {
@@ -191,8 +236,14 @@ export function SubmissionManager() {
                   {submission.file_url && (
                     <div>
                       <Label className="text-sm font-medium">Attached File:</Label>
-                      <Button variant="outline" size="sm" className="mt-1">
-                        View File
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="mt-1 flex items-center gap-2"
+                        onClick={() => downloadFile(submission.file_url!, `submission-${submission.id}`)}
+                      >
+                        <Download className="h-3 w-3" />
+                        Download File
                       </Button>
                     </div>
                   )}
@@ -203,10 +254,18 @@ export function SubmissionManager() {
                     </p>
                     {submission.status === 'pending' && (
                       <Button
-                        onClick={() => setSelectedSubmission(submission)}
+                        onClick={() => {
+                          setSelectedSubmission(submission);
+                          setReviewData({ 
+                            grade: formatGrade(submission.grade), 
+                            feedback: submission.feedback || '' 
+                          });
+                        }}
                         size="sm"
+                        className="flex items-center gap-2"
                       >
-                        Review
+                        <Star className="h-3 w-3" />
+                        Grade & Review
                       </Button>
                     )}
                   </div>
@@ -215,8 +274,11 @@ export function SubmissionManager() {
                     <div className="border-t pt-4">
                       <Label className="text-sm font-medium">Feedback:</Label>
                       <p className="mt-1 text-sm">{submission.feedback}</p>
-                      {submission.grade && (
-                        <p className="text-sm font-medium mt-2">Grade: {submission.grade}/100</p>
+                      {submission.grade !== null && (
+                        <p className="text-sm font-medium mt-2 flex items-center gap-2">
+                          <Star className="h-3 w-3" />
+                          Grade: {formatGrade(submission.grade)}/9
+                        </p>                      
                       )}
                     </div>
                   )}
@@ -230,9 +292,9 @@ export function SubmissionManager() {
       <Dialog open={!!selectedSubmission} onOpenChange={() => setSelectedSubmission(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Review Submission</DialogTitle>
+            <DialogTitle>Grade & Review Submission</DialogTitle>
             <DialogDescription>
-              Provide feedback and grade for this submission
+              Provide feedback and grade for this submission (U = Ungraded, 1-9 scale)
             </DialogDescription>
           </DialogHeader>
           
@@ -253,19 +315,38 @@ export function SubmissionManager() {
                 <p className="text-sm text-muted-foreground mt-1">
                   {selectedSubmission.content || 'No text content provided'}
                 </p>
+                {selectedSubmission.file_url && (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="mt-2 flex items-center gap-2"
+                    onClick={() => downloadFile(selectedSubmission.file_url!, `submission-${selectedSubmission.id}`)}
+                  >
+                    <Download className="h-3 w-3" />
+                    Download Attached File
+                  </Button>
+                )}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="grade">Grade (0-100)</Label>
-                <Input
-                  id="grade"
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={reviewData.grade}
-                  onChange={(e) => setReviewData({ ...reviewData, grade: e.target.value })}
-                  placeholder="Enter grade"
-                />
+                <Label htmlFor="grade">Grade</Label>
+                <Select value={reviewData.grade} onValueChange={(value) => setReviewData({ ...reviewData, grade: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select grade" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="U">U (Ungraded)</SelectItem>
+                    <SelectItem value="1">1 (Lowest)</SelectItem>
+                    <SelectItem value="2">2</SelectItem>
+                    <SelectItem value="3">3</SelectItem>
+                    <SelectItem value="4">4</SelectItem>
+                    <SelectItem value="5">5</SelectItem>
+                    <SelectItem value="6">6</SelectItem>
+                    <SelectItem value="7">7</SelectItem>
+                    <SelectItem value="8">8</SelectItem>
+                    <SelectItem value="9">9 (Highest)</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-2">
