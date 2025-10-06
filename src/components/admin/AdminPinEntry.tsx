@@ -32,15 +32,6 @@ export function AdminPinEntry({ onPinVerified }: AdminPinEntryProps) {
     setIsFirstTime(!data?.admin_pin);
   };
 
-  // Simple hash function for PIN security
-  const hashPin = async (pin: string): Promise<string> => {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(pin + "salt_key_" + pin);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  };
-
   const handlePinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -48,47 +39,56 @@ export function AdminPinEntry({ onPinVerified }: AdminPinEntryProps) {
 
     try {
       if (isFirstTime) {
-        // Setting up new pin
+        // Setting up new pin with secure server-side bcrypt hashing
         if (newPin !== confirmPin) {
           setError('Pins do not match');
           setLoading(false);
           return;
         }
         
-        if (newPin.length < 4) {
-          setError('Pin must be at least 4 digits');
+        if (newPin.length < 6) {
+          setError('Pin must be at least 6 characters');
           setLoading(false);
           return;
         }
 
-        const hashedPin = await hashPin(newPin);
-        const { error: updateError } = await supabase
-          .from('profiles')
-          .update({ 
-            admin_pin: hashedPin,
-            pin_set_at: new Date().toISOString()
-          })
-          .eq('user_id', user?.id);
+        // Use secure server-side PIN setting function
+        const { data, error: setError } = await supabase.rpc('set_admin_pin_secure', {
+          pin_text: newPin
+        });
 
-        if (updateError) throw updateError;
+        if (setError) throw setError;
         onPinVerified();
       } else {
-        // Verifying existing pin
+        // Verifying existing pin using secure server-side verification
         const { data } = await supabase
           .from('profiles')
           .select('admin_pin')
           .eq('user_id', user?.id)
           .single();
 
-        const hashedInputPin = await hashPin(pin);
-        if (data?.admin_pin === hashedInputPin) {
+        if (!data?.admin_pin) {
+          setError('No PIN set');
+          setLoading(false);
+          return;
+        }
+
+        // Use secure server-side PIN verification
+        const { data: isValid, error: verifyError } = await supabase.rpc('verify_admin_pin_secure', {
+          pin_text: pin,
+          hashed_pin: data.admin_pin
+        });
+
+        if (verifyError) throw verifyError;
+
+        if (isValid) {
           onPinVerified();
         } else {
           setError('Incorrect pin');
         }
       }
-    } catch (error) {
-      setError('Failed to process pin');
+    } catch (error: any) {
+      setError(error.message || 'Failed to process pin');
       console.error('Pin error:', error);
     } finally {
       setLoading(false);
@@ -123,11 +123,11 @@ export function AdminPinEntry({ onPinVerified }: AdminPinEntryProps) {
                   <label className="text-sm font-medium">Create Admin Pin</label>
                   <Input
                     type="password"
-                    placeholder="Enter 4+ digit pin"
+                    placeholder="Enter 6+ character pin"
                     value={newPin}
                     onChange={(e) => setNewPin(e.target.value)}
                     required
-                    minLength={4}
+                    minLength={6}
                   />
                 </div>
                 <div className="space-y-2">
@@ -138,7 +138,7 @@ export function AdminPinEntry({ onPinVerified }: AdminPinEntryProps) {
                     value={confirmPin}
                     onChange={(e) => setConfirmPin(e.target.value)}
                     required
-                    minLength={4}
+                    minLength={6}
                   />
                 </div>
               </>
