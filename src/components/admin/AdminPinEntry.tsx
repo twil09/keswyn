@@ -53,11 +53,11 @@ export function AdminPinEntry({ onPinVerified }: AdminPinEntryProps) {
         }
 
         // Use secure server-side PIN setting function
-        const { data, error: setError } = await supabase.rpc('set_admin_pin_secure', {
+        const { data, error: rpcError } = await supabase.rpc('set_admin_pin_secure', {
           pin_text: newPin
         });
 
-        if (setError) throw setError;
+        if (rpcError) throw rpcError;
         onPinVerified();
       } else {
         // Verifying existing pin using secure server-side verification
